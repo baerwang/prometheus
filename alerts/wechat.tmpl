@@ -1,0 +1,36 @@
+{{ define "wechat.default.message" }}
+{{- if gt (len .Alerts.Firing) 0 -}}
+{{- range $index, $v := .Alerts -}}
+{{- if eq $index 0 }}
+## Prometheus - 环境监控报警
+告警类型: **{{ $v.Labels.alertname }}**
+告警状态: **<font color="warning">{{ .Status }}</font>**
+告警级别: **{{ .Labels.severity }}** 🔥
+🖥️ 故障主机: {{ $v.Labels.instance }}
+**📝 告警详情:**
+主题: {{ $v.Annotations.summary }}
+详细: {{- if gt (len $v.Annotations.namespace) 0 }} Namespace: {{ $v.Annotations.namespace }} {{- end }} {{- if gt (len $v.Annotations.description) 0 }} {{ $v.Annotations.description }} {{- end }}
+触发阀值：{{ .Annotations.value }}
+🧭 故障时间: {{ ($v.StartsAt.Add 28800e9).Format "2006-01-02 15:04:05" }}
+
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if gt (len .Alerts.Resolved) 0 -}}
+{{- range $index, $v := .Alerts -}}
+{{- if eq $index 0 }}
+## Prometheus - 环境异常恢复
+告警类型: **{{ $v.Labels.alertname }}**
+告警状态: **<font color="info">{{ .Status }}</font>**
+告警级别: **{{ .Labels.severity }}**
+🖥️ 故障主机: {{ $v.Labels.instance }}
+**📝 告警详情:**
+主题: {{ $v.Annotations.summary }}
+详细: {{- if gt (len $v.Annotations.namespace) 0 }} Namespace: {{ $v.Annotations.namespace }} {{- end }} {{- if gt (len $v.Annotations.description) 0 }} {{ $v.Annotations.description }} {{- end }}
+🧭 故障时间: {{ ($v.StartsAt.Add 28800e9).Format "2006-01-02 15:04:05" }}
+🧭 恢复时间: {{ ($v.EndsAt.Add 28800e9).Format "2006-01-02 15:04:05" }}
+
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

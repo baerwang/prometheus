@@ -1,0 +1,13 @@
+groups:
+  - name: System Status
+    rules:
+      - alert: systemctl status
+        expr: up{ job!="postgres-exporter" } == 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "system {{ $labels.job }} down"
+          description: "system {{ $labels.job }} down"
+          ip: "{{ $labels.ip }}"
+          value: "up{ job={{ $labels.job}} } == 0"

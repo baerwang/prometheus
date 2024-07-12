@@ -1,0 +1,176 @@
+groups:
+  - name: White box monitoring
+    rules:
+      - alert: 系统状态
+        expr: up == 0
+        for: 30s
+        labels:
+          severity: 警告
+        annotations:
+          summary: "📍系统 {{ $labels.job }} 关闭"
+          description: "系统 {{ $labels.job }} 实例关闭"
+          ip: "{{ $labels.ip }}"
+          value: "up{ job={{ $labels.job}} } == 0"
+
+      - alert: Pod-重启
+        expr: changes(kube_pod_container_status_restarts_total{pod !~ "analyzer.*"}[3m]) > 0
+        for: 30s
+        labels:
+          severity: 警告
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster}}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍{{ $labels.pod }} Restart"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          pod: "{{ $labels.pod }}"
+          container: "{{ $labels.container }}"
+          value: 'changes(kube_pod_container_status_restarts_total{pod !~ "analyzer.*"}[3m]) > 0'
+
+      - alert: Pod-未知错误/失败
+        expr: kube_pod_status_phase{phase="Unknown"} == 1 or kube_pod_status_phase{phase="Failed"} == 1
+        for: 1m
+        labels:
+          severity: 紧急
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster }}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍Pod: {{ $labels.pod }} 未知错误/失败"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          pod: "{{ $labels.pod }}"
+          container: "{{ $labels.container }}"
+          value: 'kube_pod_status_phase{phase="Unknown"} == 1 or kube_pod_status_phase{phase="Failed"} == 1'
+
+      - alert: Job-失败
+        expr: kube_job_status_failed == 1
+        for: 3m
+        labels:
+          severity: 警告
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster }}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍Job: {{ $labels.job_name }} Failed"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          job: "{{ $labels.job_name }}"
+          value: "kube_job_status_failed == 1"
+
+      - alert: Pod NotReady
+        expr: sum by (namespace, pod, cluster_id) (max by(namespace, pod, cluster_id)(kube_pod_status_phase{namespace=~"(easm|bas)",phase=~"Pending|Unknown"}) * on(namespace, pod, cluster_id)group_left(owner_kind) topk by(namespace, pod) (1, max by(namespace, pod,owner_kind, cluster_id) (kube_pod_owner{owner_kind!="Job"}))) > 0
+        for: 3m
+        labels:
+          severity: 警告
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster }}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍pod: {{ $labels.pod }} 处于 NotReady 状态超过15分钟"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          value: 'sum by (namespace, pod, cluster_id) (max by(namespace, pod, cluster_id)(kube_pod_status_phase{namespace=~"(easm|bas)",phase=~"Pending|Unknown"}) * on(namespace, pod, cluster_id)group_left(owner_kind) topk by(namespace, pod) (1, max by(namespace, pod,owner_kind, cluster_id) (kube_pod_owner{owner_kind!="Job"}))) > 0'
+
+      - alert: Deployment副本数
+        expr: (kube_deployment_spec_replicas != kube_deployment_status_replicas_available) and (changes(kube_deployment_status_replicas_updated[5m]) == 0)
+        for: 3m
+        labels:
+          severity: 警告
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster }}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍Deployment: {{ $labels.deployment }} 实际副本数和设置副本数不一致"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          deployment: "{{ $labels.deployment }}"
+          value: '(kube_deployment_spec_replicas != kube_deployment_status_replicas_available) and (changes(kube_deployment_status_replicas_updated[5m]) == 0)'
+
+      - alert: Statefulset副本数
+        expr: (kube_statefulset_status_replicas_ready != kube_statefulset_status_replicas) and (changes(kube_statefulset_status_replicas_updated[5m]) == 0)
+        for: 3m
+        labels:
+          severity: 警告
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster }}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍Statefulset: {{ $labels.statefulset }} 实际副本数和设置副本数不一致"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          statefulset: "{{ $labels.statefulset }}"
+          value: '(kube_statefulset_status_replicas_ready != kube_statefulset_status_replicas) and (changes(kube_statefulset_status_replicas_updated[5m]) == 0)'
+
+      - alert: 存储卷PV
+        expr: kube_persistentvolume_status_phase{phase=~"Failed|Pending"} > 0
+        for: 2m
+        labels:
+          severity: 紧急
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster }}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍存储卷PV: {{ $labels.persistentvolume }} 处于Failed或Pending状态"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          persistentvolume: "{{ $labels.persistentvolume }}"
+          value: 'kube_persistentvolume_status_phase{phase=~"Failed|Pending"} > 0'
+
+      - alert: 存储卷PVC
+        expr: kube_persistentvolumeclaim_status_phase{phase=~"Failed|Pending|Lost"} > 0
+        for: 2m
+        labels:
+          severity: 紧急
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster }}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍存储卷PVC: {{ $labels.persistentvolumeclaim }} Failed或Pending状态"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          persistentvolumeclaim: "{{ $labels.persistentvolumeclaim }}"
+          value: 'kube_persistentvolumeclaim_status_phase{phase=~"Failed|Pending|Lost"} > 0'
+
+      - alert: k8s service
+        expr: kube_service_status_load_balancer_ingress != 1
+        for: 2m
+        labels:
+          severity: 紧急
+          service: prometheus_bot
+          receiver_group: "{{ $labels.k8scluster }}_{{ $labels.namespace }}"
+        annotations:
+          summary: "📍Service: {{ $labels.service }} 服务负载均衡器入口状态DOWN！"
+          k8scluster: "{{ $labels.k8scluster }}"
+          namespace: "{{ $labels.namespace }}"
+          persistentvolumeclaim: "{{ $labels.service }}"
+          value: 'kube_service_status_load_balancer_ingress != 1'
+
+      - alert: 磁盘IO性能
+        expr: 100-(avg(irate(node_disk_io_time_seconds_total[1m])) by(instance)* 100) < 60
+        for: 3m
+        labels:
+          severity: 警告
+        annotations:
+          summary: "📍{{$labels.mountpoint }} 流入磁盘IO使用率过高！"
+          description: "{{$labels.mountpoint }} 流入磁盘IO大于60%(目前使用:{{$value}})"
+
+      - alert: 网络流入
+        expr: ((sum(rate (node_network_receive_bytes_total{device!~'tap.*|veth.*|br.*|docker.*|virbr*|lo*'}[5m])) by (instance)) / 100) > 102400
+        for: 3m
+        labels:
+          severity: 警告
+        annotations:
+          summary: "📍{{$labels.mountpoint }} 流入网络带宽过高！"
+          description: "{{$labels.mountpoint }}流入网络带宽持续2分钟高于100M. RX带宽使用率{{$value}}"
+
+      - alert: 网络流出
+        expr: ((sum(rate (node_network_transmit_bytes_total{device!~'tap.*|veth.*|br.*|docker.*|virbr*|lo*'}[5m])) by (instance)) / 100) > 102400
+        for: 3m
+        labels:
+          severity: 警告
+        annotations:
+          summary: "📍{{$labels.mountpoint }} 流出网络带宽过高！"
+          description: "{{$labels.mountpoint }}流出网络带宽持续2分钟高于100M. RX带宽使用率{{$value}}"
+
+      - alert: 磁盘容量
+        expr: 100-(node_filesystem_free_bytes{fstype=~"ext4|xfs"}/node_filesystem_size_bytes {fstype=~"ext4|xfs"}*100) > 80
+        for: 1m
+        labels:
+          severity: 紧急
+        annotations:
+          summary: "📍{{$labels.mountpoint }} 磁盘分区使用率过高！"
+          description: "{{$labels.mountpoint }} 磁盘分区使用大于80%(目前使用:{{$value}}%)"

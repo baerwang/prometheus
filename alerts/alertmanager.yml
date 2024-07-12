@@ -1,0 +1,29 @@
+global:
+  resolve_timeout: 1m
+  wechat_api_url: 'https://qyapi.weixin.qq.com/cgi-bin/'
+  wechat_api_corp_id: ''
+  wechat_api_secret: ''
+
+templates:
+  - '/opt/prometheus/alertmanager/wechat.tmpl'
+
+route:
+  group_by: [ 'alertname' ]
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 3m
+  receiver: 'wechat'
+receivers:
+  - name: 'wechat'
+    wechat_configs:
+      - send_resolved: true
+        message: '{{ template "wechat.default.message" . }}'
+        to_party: ''           # 企业微信中创建的接收告警的告警部门ID
+        agent_id: ''      # 企业微信中创建应用的AgentId
+        message_type: 'markdown' # md 类型，默认为text
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: [ 'alertname', 'dev', 'instance' ]
