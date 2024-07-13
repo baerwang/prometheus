@@ -4,6 +4,8 @@
 
 [alert 通知指标规则汇总](https://samber.github.io/awesome-prometheus-alerts/)
 
+## alert 通知企业微信
+
 ## 使用psql-exporter
 
 [docs](https://github.com/prometheus-community/postgres_exporter)
